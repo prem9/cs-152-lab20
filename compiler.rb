@@ -14,9 +14,11 @@ class AST
     @parent = parent
     @args = []
   end
+
   def add_arg(x)
     @args.push(x)
   end
+
   def to_s
     s = "(" + @op
     @args.each do |arg|
@@ -24,6 +26,7 @@ class AST
     end
     s + ")"
   end
+
   # recursively evaluates the AST, used for the interpreter
   def evaluate
     case @op
@@ -58,6 +61,7 @@ class AST
       raise "Unrecognized op '#{@op}'"
     end
   end
+
   # recursively compiles the AST to bytecode, used for the compiler
   def to_bytecode
     bytecode = []
@@ -67,14 +71,35 @@ class AST
       bytecode.push(PRINT_OP)
     #
     # YOUR CODE HERE -- Add 'when' cases to support the other expressions.
+    #
+    when '+'
+      comp_arg(@args[0], bytecode)
+      (1...@args.length).each do |i|
+        comp_arg(@args[i], bytecode)
+        bytecode.push(ADD_OP)
+      end
+    when '-'
+      comp_arg(@args[0], bytecode)
+      (1...@args.length).each do |i|
+        comp_arg(@args[i], bytecode)
+        bytecode.push(SUB_OP)
+      end
+    when '*'
+      comp_arg(@args[0], bytecode)
+      (1...@args.length).each do |i|
+        comp_arg(@args[i], bytecode)
+        bytecode.push(MUL_OP)
+      end
     else
       raise "Unrecognized op '#{@op}'"
     end
     bytecode # Returning bytecode
   end
+
   private # Unlike Java, this means that *all* of the following functions in AST are private.
+
   def comp_arg(v, bytecode)
-    if v.is_a?(Integer) then
+    if v.is_a?(Integer)
       bytecode.push("#{PUSH_OP} #{v}")
     else
       bytecode.concat(v.to_bytecode)
@@ -93,7 +118,9 @@ class Parser
     end
     asts # Returning the ASTs
   end
+
   private # Unlike Java, this means that *all* of the following functions in AST are private.
+
   # String -> tokens
   def tokenize_line(line)
     # Adding spaces around parens to make tokenization trivial.
@@ -101,29 +128,38 @@ class Parser
     line = line.gsub(/\)/, ' ) ')
     line.split
   end
+
   # [token] -> [AST]
   def parse_line(line)
     tokens = tokenize_line(line)
     ast = nil
     i = 0
-    while (i <= tokens.length)
+    while (i < tokens.length)
       case tokens[i]
       when '('
         ast = AST.new(tokens[i+1], ast) # Assuming that we will only receive valid programs
         i += 1 # Skipping an extra token
       when ')'
-        if ast.parent then
+        if ast.parent
           ast.parent.add_arg(ast)
           ast = ast.parent
         end
       when NUM_PAT
-        if ast then
+        if ast
           ast.add_arg(tokens[i].to_i)
         else
           raise "Top-level numbers are not permitted"
         end
-      when /.+/ # If anything else matches (and is at least one char), raise an error
-        raise "Unrecognized token: '#{tokens[i]}'"
+      when /.+/
+        if ['println', '+', '-', '*'].include?(tokens[i])
+          if ast
+            ast.add_arg(AST.new(tokens[i], ast))
+          else
+            raise "Operator '#{tokens[i]}' outside of parentheses"
+          end
+        else
+          raise "Unrecognized token: '#{tokens[i]}'"
+        end
       end
       i += 1
     end
@@ -137,6 +173,7 @@ class Interpreter
   def initialize
     @parser = Parser.new
   end
+
   def execute(file)
     asts = @parser.parse(file)
     asts.each do |ast|
@@ -150,11 +187,12 @@ class Compiler
   def initialize
     @parser = Parser.new
   end
+
   def compile(scheme_file, bytecode_file)
     asts = @parser.parse(scheme_file)
     File.open(bytecode_file, 'w') do |out|
       asts.each do |ast|
-        if ast then
+        if ast
           puts "Parsing #{ast}"
           bytecode = ast.to_bytecode
           out.puts bytecode
@@ -163,7 +201,6 @@ class Compiler
     end
   end
 end
-
 
 if ARGV.length < 2
   puts "Usage: ruby compiler.rb <scheme file> <bytecode file>"
@@ -175,4 +212,3 @@ output = ARGV[1]
 
 comp = Compiler.new
 comp.compile(source, output)
-
